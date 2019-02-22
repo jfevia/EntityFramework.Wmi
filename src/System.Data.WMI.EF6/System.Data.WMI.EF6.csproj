@@ -69,6 +69,16 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Remove="Resources\WMIProviderServices.ProviderManifest.xml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\WMIProviderServices.ProviderManifest.xml">
+      <LogicalName>System.Data.WMI.WMIProviderServices.ProviderManifest.xml</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="EntityFramework" Version="6.2.0" />
   </ItemGroup>
 

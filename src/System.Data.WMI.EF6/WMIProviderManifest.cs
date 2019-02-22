@@ -54,76 +54,27 @@ namespace System.Data.WMI.EF6
             if (StoreTypeNameToEdmPrimitiveType.TryGetValue(storeTypeName, out var edmPrimitiveType) == false)
                 throw new ArgumentException($"WMI does not support the type '{storeTypeName}'.");
 
-            int maxLength;
-            var isUnicode = true;
-            bool isFixedLen;
-            bool isUnbounded;
-
-            PrimitiveTypeKind newPrimitiveTypeKind;
-
             switch (storeTypeName)
             {
-                case "tinyint":
-                case "smallint":
-                case "integer":
-                case "bit":
-                case "uniqueidentifier":
-                case "int":
-                case "float":
-                case "real":
+                case "boolean":
+                case "sint8":
+                case "sint16":
+                case "sint32":
+                case "sint64":
+                case "uint8":
+                case "uint16":
+                case "uint32":
+                case "uint64":
+                case "real32":
+                case "real64":
                     return TypeUsage.CreateDefaultTypeUsage(edmPrimitiveType);
 
-                case "varchar":
-                    newPrimitiveTypeKind = PrimitiveTypeKind.String;
-                    isUnbounded = !TypeHelpers.TryGetMaxLength(storeType, out maxLength);
-                    isUnicode = false;
-                    isFixedLen = false;
-                    break;
-                case "char":
-                    newPrimitiveTypeKind = PrimitiveTypeKind.String;
-                    isUnbounded = !TypeHelpers.TryGetMaxLength(storeType, out maxLength);
-                    isUnicode = false;
-                    isFixedLen = true;
-                    break;
-                case "nvarchar":
-                    newPrimitiveTypeKind = PrimitiveTypeKind.String;
-                    isUnbounded = !TypeHelpers.TryGetMaxLength(storeType, out maxLength);
-                    isUnicode = true;
-                    isFixedLen = false;
-                    break;
-                case "nchar":
-                    newPrimitiveTypeKind = PrimitiveTypeKind.String;
-                    isUnbounded = !TypeHelpers.TryGetMaxLength(storeType, out maxLength);
-                    isUnicode = true;
-                    isFixedLen = true;
-                    break;
-                case "blob":
-                    newPrimitiveTypeKind = PrimitiveTypeKind.Binary;
-                    isUnbounded = !TypeHelpers.TryGetMaxLength(storeType, out maxLength);
-                    isFixedLen = false;
-                    break;
-                case "decimal":
-                    if (TypeHelpers.TryGetPrecision(storeType, out var precision) && TypeHelpers.TryGetScale(storeType, out var scale))
-                        return TypeUsage.CreateDecimalTypeUsage(edmPrimitiveType, precision, scale);
-                    return TypeUsage.CreateDecimalTypeUsage(edmPrimitiveType);
+                case "string":
+                case "char16":
+                    return TypeUsage.CreateStringTypeUsage(edmPrimitiveType, true, false, int.MaxValue);
+
                 case "datetime":
                     return TypeUsage.CreateDateTimeTypeUsage(edmPrimitiveType, null);
-                default:
-                    throw new NotSupportedException($"WMI does not support the type '{storeTypeName}'.");
-            }
-
-            switch (newPrimitiveTypeKind)
-            {
-                case PrimitiveTypeKind.String:
-                    if (!isUnbounded)
-                        return TypeUsage.CreateStringTypeUsage(edmPrimitiveType, isUnicode, isFixedLen, maxLength);
-                    else
-                        return TypeUsage.CreateStringTypeUsage(edmPrimitiveType, isUnicode, isFixedLen);
-                case PrimitiveTypeKind.Binary:
-                    if (!isUnbounded)
-                        return TypeUsage.CreateBinaryTypeUsage(edmPrimitiveType, isFixedLen, maxLength);
-                    else
-                        return TypeUsage.CreateBinaryTypeUsage(edmPrimitiveType, isFixedLen);
                 default:
                     throw new NotSupportedException($"WMI does not support the type '{storeTypeName}'.");
             }
@@ -142,103 +93,34 @@ namespace System.Data.WMI.EF6
             if (!(edmType.EdmType is PrimitiveType primitiveType))
                 throw new ArgumentException($"WMI does not support the type '{edmType}'.");
 
-            var facets = edmType.Facets;
-
             switch (primitiveType.PrimitiveTypeKind)
             {
                 case PrimitiveTypeKind.Boolean:
-                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["bit"]);
-                case PrimitiveTypeKind.Byte:
-                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["tinyint"]);
+                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["boolean"]);
+                case PrimitiveTypeKind.SByte:
+                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["sint8"]);
                 case PrimitiveTypeKind.Int16:
-                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["smallint"]);
+                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["sint16"]);
                 case PrimitiveTypeKind.Int32:
-                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["int"]);
+                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["sint32"]);
                 case PrimitiveTypeKind.Int64:
-                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["integer"]);
-                case PrimitiveTypeKind.Guid:
-                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["uniqueidentifier"]);
+                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["sint64"]);
                 case PrimitiveTypeKind.Double:
-                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["float"]);
+                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["real64"]);
                 case PrimitiveTypeKind.Single:
-                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["real"]);
+                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["real32"]);
+                case PrimitiveTypeKind.Byte:
+                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["uint8"]);
                 case PrimitiveTypeKind.Decimal:
-                {
-                    // This applies to decimal, numeric, smallmoney, money
-                    if (!TypeHelpers.TryGetPrecision(edmType, out var precision))
-                        precision = 18;
-
-                    if (!TypeHelpers.TryGetScale(edmType, out var scale))
-                        scale = 0;
-
-                    return TypeUsage.CreateDecimalTypeUsage(StoreTypeNameToStorePrimitiveType["decimal"], precision, scale);
-                }
-                case PrimitiveTypeKind.Binary:
-                {
-                    // This applies to binary, varbinary, varbinary(max), image, timestamp, rowversion
-                    var isFixedLength = null != facets["FixedLength"].Value && (bool) facets["FixedLength"].Value;
-                    var f = facets["MaxLength"];
-
-                    var isMaxLength = f.IsUnbounded || null == f.Value;
-                    var maxLength = !isMaxLength ? (int) f.Value : int.MinValue;
-
-                    TypeUsage tu;
-                    if (isFixedLength)
-                        tu = TypeUsage.CreateBinaryTypeUsage(StoreTypeNameToStorePrimitiveType["blob"], true, maxLength);
-                    else
-                    {
-                        if (isMaxLength)
-                            tu = TypeUsage.CreateBinaryTypeUsage(StoreTypeNameToStorePrimitiveType["blob"], false);
-                        else
-                            tu = TypeUsage.CreateBinaryTypeUsage(StoreTypeNameToStorePrimitiveType["blob"], false, maxLength);
-                    }
-
-                    return tu;
-                }
+                    return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["uint64"]);
                 case PrimitiveTypeKind.String:
-                {
-                    // This applies to char, nchar, varchar, nvarchar, varchar(max), nvarchar(max), ntext, text
-                    var isUnicode = null == facets["Unicode"].Value || (bool) facets["Unicode"].Value;
-                    var isFixedLength = null != facets["FixedLength"].Value && (bool) facets["FixedLength"].Value;
-                    var facet = facets["MaxLength"];
-
-                    // maxlen is true if facet value is unbounded, the value is bigger than the limited string sizes *or* the facet
-                    // value is null. this is needed since functions still have maxlength facet value as null
-                    var isMaxLength = facet.IsUnbounded || null == facet.Value;
-                    var maxLength = !isMaxLength ? (int) facet.Value : int.MinValue;
-
-                    TypeUsage typeUsage;
-
-                    if (isUnicode)
-                    {
-                        if (isFixedLength)
-                            typeUsage = TypeUsage.CreateStringTypeUsage(StoreTypeNameToStorePrimitiveType["nchar"], true, true, maxLength);
-                        else
-                        {
-                            if (isMaxLength)
-                                typeUsage = TypeUsage.CreateStringTypeUsage(StoreTypeNameToStorePrimitiveType["nvarchar"], true, false);
-                            else
-                                typeUsage = TypeUsage.CreateStringTypeUsage(StoreTypeNameToStorePrimitiveType["nvarchar"], true, false, maxLength);
-                        }
-                    }
-                    else
-                    {
-                        if (isFixedLength)
-                            typeUsage = TypeUsage.CreateStringTypeUsage(StoreTypeNameToStorePrimitiveType["char"], false, true, maxLength);
-                        else
-                        {
-                            if (isMaxLength)
-                                typeUsage = TypeUsage.CreateStringTypeUsage(StoreTypeNameToStorePrimitiveType["varchar"], false, false);
-                            else
-                                typeUsage = TypeUsage.CreateStringTypeUsage(StoreTypeNameToStorePrimitiveType["varchar"], false, false, maxLength);
-                        }
-                    }
-
-                    return typeUsage;
-                }
+                    return TypeUsage.CreateStringTypeUsage(StoreTypeNameToStorePrimitiveType["string"], true, false, int.MaxValue);
                 case PrimitiveTypeKind.DateTime:
-                    // This applies to datetime, smalldatetime
                     return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["datetime"]);
+                //case PrimitiveTypeKind.UInt16:
+                //  return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["uint16"]);
+                //case PrimitiveTypeKind.UInt32:
+                //  return TypeUsage.CreateDefaultTypeUsage(StoreTypeNameToStorePrimitiveType["uint32"]);
                 default:
                     throw new NotSupportedException($"There is no store type corresponding to the EDM type '{edmType}' of primitive type '{primitiveType.PrimitiveTypeKind}'.");
             }
@@ -258,49 +140,7 @@ namespace System.Data.WMI.EF6
         {
             var executingAssembly = Assembly.GetExecutingAssembly();
             var stream = executingAssembly.GetManifestResourceStream(resourceName);
-            return XmlReader.Create(stream);
-        }
-
-        private static class TypeHelpers
-        {
-            public static bool TryGetPrecision(TypeUsage typeUsage, out byte precision)
-            {
-                precision = 0;
-                if (!typeUsage.Facets.TryGetValue("Precision", false, out var facet))
-                    return false;
-
-                if (facet.IsUnbounded || facet.Value == null)
-                    return false;
-
-                precision = (byte) facet.Value;
-                return true;
-            }
-
-            public static bool TryGetMaxLength(TypeUsage typeUsage, out int maxLength)
-            {
-                maxLength = 0;
-                if (!typeUsage.Facets.TryGetValue("MaxLength", false, out var facet))
-                    return false;
-
-                if (facet.IsUnbounded || facet.Value == null)
-                    return false;
-
-                maxLength = (int) facet.Value;
-                return true;
-            }
-
-            public static bool TryGetScale(TypeUsage typeUsage, out byte scale)
-            {
-                scale = 0;
-                if (!typeUsage.Facets.TryGetValue("Scale", false, out var facet))
-                    return false;
-
-                if (facet.IsUnbounded || facet.Value == null)
-                    return false;
-
-                scale = (byte) facet.Value;
-                return true;
-            }
+            return XmlReader.Create(stream ?? throw new InvalidOperationException("Stream cannot be null"));
         }
     }
 }

@@ -1,8 +1,9 @@
-﻿using System.Data.Common;
+﻿using System.Collections.Generic;
+using System.Data.Common;
 
 namespace System.Data.WMI
 {
-    public sealed class WMICommand : DbCommand
+    public sealed class WMICommand : DbCommand, ICloneable
     {
         /// <summary>
         ///     Initializes a new instance of the <see cref="WMICommand" /> class.
@@ -40,6 +41,33 @@ namespace System.Data.WMI
             CommandText = commandText;
             DbConnection = connection;
         }
+
+        /// <summary>
+        ///     Initializes a new instance of the <see cref="WMICommand" /> class.
+        /// </summary>
+        /// <param name="source">The source.</param>
+        private WMICommand(WMICommand source)
+            : this(source.CommandText, (WMIConnection) source.Connection)
+        {
+            CommandTimeout = source.CommandTimeout;
+            DesignTimeVisible = source.DesignTimeVisible;
+            UpdatedRowSource = source.UpdatedRowSource;
+
+            if (source.InternalParameters != null)
+                foreach (WMIParameter param in source.InternalParameters)
+                    Parameters.Add(param.Clone());
+
+            if (source.Columns != null)
+                Columns = new List<string>(source.Columns);
+        }
+
+        /// <summary>
+        ///     Gets the internal parameters.
+        /// </summary>
+        /// <value>
+        ///     The internal parameters.
+        /// </value>
+        internal DbParameterCollection InternalParameters => Parameters;
 
         /// <summary>
         ///     Gets or sets the text command to run against the data source.
@@ -83,6 +111,25 @@ namespace System.Data.WMI
         ///     Gets or sets a value indicating whether the command object should be visible in a customized interface control.
         /// </summary>
         public override bool DesignTimeVisible { get; set; }
+
+        /// <summary>
+        ///     Gets or sets the columns.
+        /// </summary>
+        /// <value>
+        ///     The columns.
+        /// </value>
+        public IList<string> Columns { get; set; }
+
+        /// <summary>
+        ///     Creates a new object that is a copy of the current instance.
+        /// </summary>
+        /// <returns>
+        ///     A new object that is a copy of this instance.
+        /// </returns>
+        public object Clone()
+        {
+            return new WMICommand(this);
+        }
 
         public override void Prepare()
         {

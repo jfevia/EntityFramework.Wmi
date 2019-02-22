@@ -35,13 +35,14 @@ namespace System.Data.WMI.EF6
             var command = new WMICommand();
             try
             {
-                command.CommandText = SqlGenerator.GenerateSql((WMIProviderManifest) manifest, commandTree, out var parameters, out var commandType);
+                command.CommandText = SqlGenerator.GenerateSql((WMIProviderManifest) manifest, commandTree, out var columns, out var parameters, out var commandType);
+                command.Columns = columns;
                 command.CommandType = commandType;
 
                 // Get the function (if any) implemented by the command tree since this influences our interpretation of parameters
                 EdmFunction function = null;
-                if (commandTree is DbFunctionCommandTree)
-                    function = ((DbFunctionCommandTree) commandTree).EdmFunction;
+                if (commandTree is DbFunctionCommandTree tree)
+                    function = tree.EdmFunction;
 
                 // Now make sure we populate the command's parameters from the CQT's parameters:
                 foreach (var queryParameter in commandTree.Parameters)
@@ -126,7 +127,8 @@ namespace System.Data.WMI.EF6
 
             // .Direction
             var direction = MetadataHelpers.ParameterModeToParameterDirection(mode);
-            if (result.Direction != direction) result.Direction = direction;
+            if (result.Direction != direction)
+                result.Direction = direction;
 
             // .Size and .DbType
             // output parameters are handled differently (we need to ensure there is space for return
@@ -137,11 +139,13 @@ namespace System.Data.WMI.EF6
 
             // Note that we overwrite 'facet' parameters where either the value is different or
             // there is an output parameter.
-            if (size.HasValue && (isOutParam || result.Size != size.Value)) result.Size = size.Value;
+            if (size.HasValue && (isOutParam || result.Size != size.Value))
+                result.Size = size.Value;
 
             // .IsNullable
             var isNullable = MetadataHelpers.IsNullable(type);
-            if (isOutParam || isNullable != result.IsNullable) result.IsNullable = isNullable;
+            if (isOutParam || isNullable != result.IsNullable)
+                result.IsNullable = isNullable;
 
             return result;
         }
@@ -235,9 +239,11 @@ namespace System.Data.WMI.EF6
                          PrimitiveTypeKind.String == ((PrimitiveType) type.EdmType).PrimitiveTypeKind, "only valid for string type");
 
             DbType dbType;
-            if (!MetadataHelpers.TryGetIsFixedLength(type, out var fixedLength)) fixedLength = false;
+            if (!MetadataHelpers.TryGetIsFixedLength(type, out var fixedLength))
+                fixedLength = false;
 
-            if (!MetadataHelpers.TryGetIsUnicode(type, out var unicode)) unicode = true;
+            if (!MetadataHelpers.TryGetIsUnicode(type, out var unicode))
+                unicode = true;
 
             if (fixedLength)
                 dbType = unicode ? DbType.StringFixedLength : DbType.AnsiStringFixedLength;

@@ -3,7 +3,7 @@ using System.Data.Common;
 
 namespace System.Data.WMI
 {
-    public sealed class WMIParameter : DbParameter
+    public sealed class WMIParameter : DbParameter, ICloneable
     {
         /// <summary>
         ///     This value represents an "unknown" <see cref="DbType" />.
@@ -12,6 +12,7 @@ namespace System.Data.WMI
 
         private DbType _dbType;
         private object _objValue;
+        private WMIParameter wMIParameter;
 
         /// <summary>
         ///     Constructor used when creating for use with a specific command.
@@ -242,6 +243,15 @@ namespace System.Data.WMI
         }
 
         /// <summary>
+        ///     Initializes a new instance of the <see cref="WMIParameter" /> class.
+        /// </summary>
+        /// <param name="source">The source.</param>
+        public WMIParameter(WMIParameter source)
+            : this(source.ParameterName, source._dbType, 0, source.Direction, source.IsNullable, source.SourceColumn, source.SourceVersion, source.Value)
+        {
+        }
+
+        /// <summary>
         ///     The command associated with this parameter.
         /// </summary>
         public IDbCommand Command { get; set; }
@@ -288,12 +298,12 @@ namespace System.Data.WMI
         }
 
         /// <summary>
-        /// Gets or sets the name of the <see cref="T:System.Data.Common.DbParameter"/>.
+        ///     Gets or sets the name of the <see cref="T:System.Data.Common.DbParameter" />.
         /// </summary>
         public override string ParameterName { get; set; }
 
         /// <summary>
-        /// Gets or sets the maximum size, in bytes, of the data within the column.
+        ///     Gets or sets the maximum size, in bytes, of the data within the column.
         /// </summary>
         [DefaultValue(0)]
         public override int Size { get; set; }
@@ -336,6 +346,17 @@ namespace System.Data.WMI
         ///     The database type name associated with this parameter, if any.
         /// </summary>
         public string TypeName { get; set; }
+
+        /// <summary>
+        ///     Creates a new object that is a copy of the current instance.
+        /// </summary>
+        /// <returns>
+        ///     A new object that is a copy of this instance.
+        /// </returns>
+        public object Clone()
+        {
+            return new WMIParameter(this);
+        }
 
         /// <summary>
         ///     Resets the DbType of the parameter so it can be inferred from the value

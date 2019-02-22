@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!-- WARNING: The order in which types are described here has impact in lookup process -->
+<ProviderManifest Namespace="WMI" xmlns="http://schemas.microsoft.com/ado/2006/04/edm/providermanifest">
+  <Types>
+    <Type Name="sint8" PrimitiveTypeKind="SByte">
+    </Type>
+    <Type Name="sint16" PrimitiveTypeKind="Int16">
+    </Type>
+    <Type Name="sint32" PrimitiveTypeKind="Int32">
+    </Type>
+    <Type Name="sint64" PrimitiveTypeKind="Int64">
+    </Type>
+    <Type Name="uint8" PrimitiveTypeKind="Byte">
+    </Type>
+    <Type Name="uint16" PrimitiveTypeKind="Int32">
+    </Type>
+    <Type Name="uint32" PrimitiveTypeKind="Int64">
+    </Type>
+    <Type Name="uint64" PrimitiveTypeKind="Decimal">
+      <FacetDescriptions>
+        <Precision Minimum="20" Maximum="20" DefaultValue="20" Constant="true" />
+        <Scale Minimum="0" Maximum="0" DefaultValue="0" Constant="true" />
+      </FacetDescriptions>
+    </Type>
+    <Type Name="real32" PrimitiveTypeKind="Single">
+    </Type>
+    <Type Name="real64" PrimitiveTypeKind="Double">
+    </Type>
+    <Type Name="boolean" PrimitiveTypeKind="Boolean">
+    </Type>
+    <Type Name="datetime" PrimitiveTypeKind="DateTime">
+      <FacetDescriptions>
+        <Precision DefaultValue="3" Constant="true" />
+      </FacetDescriptions>
+    </Type>
+    <Type Name="string" PrimitiveTypeKind="String">
+      <FacetDescriptions>
+        <MaxLength Minimum="1" Maximum="2147483647" DefaultValue="2147483647" Constant="false" />
+        <Unicode DefaultValue="true" Constant="true" />
+        <FixedLength DefaultValue="false" Constant="true" />
+      </FacetDescriptions>
+    </Type>
+    <Type Name="char16" PrimitiveTypeKind="String">
+      <FacetDescriptions>
+        <MaxLength Minimum="1" Maximum="2147483647" DefaultValue="2147483647" Constant="false" />
+        <Unicode DefaultValue="true" Constant="true" />
+        <FixedLength DefaultValue="false" Constant="true" />
+      </FacetDescriptions>
+    </Type>
+  </Types>
+</ProviderManifest>

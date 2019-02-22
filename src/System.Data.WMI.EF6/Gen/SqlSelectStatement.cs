@@ -185,10 +185,13 @@ namespace System.Data.WMI.EF6.Gen
             writer.Indent += 1; // ++ can be confusing in this context
 
             writer.Write("SELECT ");
-            if (IsDistinct) writer.Write("DISTINCT ");
+            if (IsDistinct)
+                writer.Write("DISTINCT ");
 
             if (null == Select || Select.IsEmpty)
                 throw new InvalidOperationException("Invalid statement");
+
+            Select.WriteSql(writer, sqlGenerator);
 
             writer.WriteLine();
             writer.Write("FROM ");

@@ -1,5 +1,7 @@
 ﻿using System.Collections;
+using System.Collections.Generic;
 using System.Data.Common;
+using System.Linq;
 using System.Management;
 
 namespace System.Data.WMI
@@ -7,12 +9,17 @@ namespace System.Data.WMI
     public sealed class WMIDataReader : DbDataReader
     {
         private readonly CommandBehavior _behavior;
-        private readonly WMICommand _command;
+        private WMICommand _command;
         private bool _isClosed;
+        private bool _isQueryExecuted;
         private ManagementObject _managementObject;
         private ManagementObjectCollection _managementObjectCollection;
         private ManagementObjectSearcher _managementObjectSearcher;
-        private bool _isQueryExecuted;
+        private PropertyData[] _properties;
+        private Dictionary<string, PropertyData> _propertyByName;
+        private List<string> _propertyNames;
+        private int _rowCount;
+        private ManagementBaseObject[] _rows;
 
         /// <summary>
         ///     Initializes a new instance of the <see cref="WMIDataReader" /> class.
@@ -81,6 +88,13 @@ namespace System.Data.WMI
         /// </summary>
         public override int Depth => 0;
 
+        /// <summary>
+        ///     Returns a <see cref="T:System.Data.DataTable"></see> that describes the column metadata of the
+        ///     <see cref="T:System.Data.Common.DbDataReader"></see>.
+        /// </summary>
+        /// <returns>
+        ///     A <see cref="T:System.Data.DataTable"></see> that describes the column metadata.
+        /// </returns>
         public override DataTable GetSchemaTable()
         {
             throw new NotImplementedException();
@@ -97,7 +111,7 @@ namespace System.Data.WMI
         /// </returns>
         public override bool GetBoolean(int ordinal)
         {
-            return (bool) GetValue(ordinal);
+            return Convert.ToBoolean(GetValue(ordinal));
         }
 
         /// <summary>
@@ -111,7 +125,7 @@ namespace System.Data.WMI
         /// </returns>
         public override byte GetByte(int ordinal)
         {
-            return (byte) GetValue(ordinal);
+            return Convert.ToByte(GetValue(ordinal));
         }
 
         /// <summary>
@@ -153,7 +167,7 @@ namespace System.Data.WMI
         /// </returns>
         public override char GetChar(int ordinal)
         {
-            return (char) GetValue(ordinal);
+            return Convert.ToChar(GetValue(ordinal));
         }
 
         /// <summary>
@@ -208,7 +222,8 @@ namespace System.Data.WMI
         /// </returns>
         public override DateTime GetDateTime(int ordinal)
         {
-            return ManagementDateTimeConverter.ToDateTime(GetString(ordinal));
+            var value = GetString(ordinal);
+            return ManagementDateTimeConverter.ToDateTime(value);
         }
 
         /// <summary>
@@ -222,7 +237,7 @@ namespace System.Data.WMI
         /// </returns>
         public override decimal GetDecimal(int ordinal)
         {
-            return (decimal) GetValue(ordinal);
+            return Convert.ToDecimal(GetValue(ordinal));
         }
 
         /// <summary>
@@ -236,7 +251,7 @@ namespace System.Data.WMI
         /// </returns>
         public override double GetDouble(int ordinal)
         {
-            return (double) GetValue(ordinal);
+            return Convert.ToDouble(GetValue(ordinal));
         }
 
         /// <summary>
@@ -263,7 +278,7 @@ namespace System.Data.WMI
         /// </returns>
         public override float GetFloat(int ordinal)
         {
-            return (float) GetValue(ordinal);
+            return Convert.ToSingle(GetValue(ordinal));
         }
 
         /// <summary>
@@ -277,7 +292,7 @@ namespace System.Data.WMI
         /// </returns>
         public override Guid GetGuid(int ordinal)
         {
-            return (Guid) GetValue(ordinal);
+            throw new NotSupportedException();
         }
 
         /// <summary>
@@ -291,7 +306,7 @@ namespace System.Data.WMI
         /// </returns>
         public override short GetInt16(int ordinal)
         {
-            return (short) GetValue(ordinal);
+            return Convert.ToInt16(GetValue(ordinal));
         }
 
         /// <summary>
@@ -305,7 +320,7 @@ namespace System.Data.WMI
         /// </returns>
         public override int GetInt32(int ordinal)
         {
-            return (int) GetValue(ordinal);
+            return Convert.ToInt32(GetValue(ordinal));
         }
 
         /// <summary>
@@ -319,7 +334,7 @@ namespace System.Data.WMI
         /// </returns>
         public override long GetInt64(int ordinal)
         {
-            return (long) GetValue(ordinal);
+            return Convert.ToInt64(GetValue(ordinal));
         }
 
         /// <summary>
@@ -336,7 +351,7 @@ namespace System.Data.WMI
         /// </exception>
         public override string GetName(int ordinal)
         {
-            return GetPropertyDataFromOrdinal(ordinal).Name;
+            return _command.Columns[ordinal];
         }
 
         /// <summary>
@@ -347,11 +362,8 @@ namespace System.Data.WMI
         /// <exception cref="System.InvalidOperationException">Could not find property from ordinal value</exception>
         private PropertyData GetPropertyDataFromOrdinal(int ordinal)
         {
-            foreach (var property in _managementObject.Properties)
-                if (--ordinal == 0)
-                    return property;
-
-            throw new InvalidOperationException("Could not find property from ordinal value");
+            var propertyName = _propertyNames[ordinal];
+            return _propertyByName[propertyName];
         }
 
         /// <summary>
@@ -365,16 +377,7 @@ namespace System.Data.WMI
         /// </returns>
         public override int GetOrdinal(string name)
         {
-            var ordinal = 0;
-            foreach (var property in _managementObject.Properties)
-            {
-                if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase))
-                    break;
-
-                ++ordinal;
-            }
-
-            return ordinal;
+            return _propertyNames.IndexOf(name);
         }
 
         /// <summary>
@@ -388,7 +391,7 @@ namespace System.Data.WMI
         /// </returns>
         public override string GetString(int ordinal)
         {
-            return (string) GetValue(ordinal);
+            return Convert.ToString(GetValue(ordinal));
         }
 
         /// <summary>
@@ -402,7 +405,8 @@ namespace System.Data.WMI
         /// </returns>
         public override object GetValue(int ordinal)
         {
-            return _managementObject.GetPropertyValue(GetName(ordinal));
+            var propertyName = GetName(ordinal);
+            return _managementObject.GetPropertyValue(propertyName);
         }
 
         /// <summary>
@@ -434,9 +438,12 @@ namespace System.Data.WMI
             return GetValue(ordinal) == null;
         }
 
+        /// <summary>
+        ///     Closes the <see cref="T:System.Data.Common.DbDataReader"></see> object.
+        /// </summary>
         public override void Close()
         {
-            throw new NotImplementedException();
+            _command = null;
         }
 
         /// <summary>
@@ -461,20 +468,39 @@ namespace System.Data.WMI
         {
             if (!_isQueryExecuted)
             {
-                _managementObjectSearcher = new ManagementObjectSearcher(_command.Connection.ConnectionString, _command.CommandText);
+                if (!(_command.Connection is WMIConnection connection))
+                    throw new InvalidOperationException("Connection is not of type WMIConnection");
+
+                _managementObjectSearcher = new ManagementObjectSearcher(connection.Path, _command.CommandText);
                 _managementObjectCollection = _managementObjectSearcher.Get();
+
+                _rows = new ManagementBaseObject[_managementObjectCollection.Count];
+                _managementObjectCollection.CopyTo(_rows, 0);
+
                 _isQueryExecuted = true;
             }
 
-            ManagementObject next = null;
-            foreach (ManagementObject managementObject in this)
+            var enumerator = GetEnumerator();
+            if (enumerator.MoveNext())
             {
-                next = managementObject;
-                break;
-            }
+                _managementObject = (ManagementObject) enumerator.Current;
+                if (_managementObject != null)
+                {
+                    _properties = new PropertyData[_managementObject.Properties.Count];
+                    _managementObject.Properties.CopyTo(_properties, 0);
 
-            _managementObject = next;
-            _isClosed = _managementObject == null;
+                    _propertyByName = _properties.ToDictionary(s => s.Name);
+                    _propertyNames = _propertyByName.Keys.OrderBy(s => s).ToList();
+                }
+
+                _rowCount++;
+            }
+            else
+                _rowCount = _managementObjectCollection.Count + 1;
+
+            if (_rowCount > _managementObjectCollection.Count)
+                _isClosed = true;
+
             return !_isClosed;
         }
 

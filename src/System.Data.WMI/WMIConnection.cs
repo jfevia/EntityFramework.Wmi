@@ -35,7 +35,28 @@ namespace System.Data.WMI
         }
 
         public event EventHandler<WMIConnectionChangedEventArgs> Changed;
+
+        /// <summary>
+        ///     Occurs when the state of the event changes.
+        /// </summary>
+        /// <returns></returns>
+        public override event StateChangeEventHandler StateChange;
+
         public event EventHandler<WMITransactionStartedEventArgs> TransactionStarted;
+
+        /// <summary>
+        ///     Gets the provider factory.
+        /// </summary>
+        /// <value>
+        ///     The provider factory.
+        /// </value>
+        public DbProviderFactory ProviderFactory => DbProviderFactory;
+
+        /// <summary>
+        ///     Gets the <see cref="T:System.Data.Common.DbProviderFactory"></see> for this
+        ///     <see cref="T:System.Data.Common.DbConnection"></see>.
+        /// </summary>
+        protected override DbProviderFactory DbProviderFactory => WMIFactory.Instance;
 
         /// <summary>
         ///     Gets or sets the string used to open the connection.
@@ -57,6 +78,18 @@ namespace System.Data.WMI
             }
         }
 
+        /// <summary>
+        ///     Gets the path.
+        /// </summary>
+        /// <value>
+        ///     The path.
+        /// </value>
+        public string Path => $@"\\{DataSource}\{Database}";
+
+        /// <summary>
+        ///     Gets the name of the current database after a connection is opened, or the database name specified in the
+        ///     connection string before the connection is opened.
+        /// </summary>
         public override string Database => _connectionStringBuilder.Namespace;
 
         /// <summary>
@@ -106,7 +139,20 @@ namespace System.Data.WMI
         public override void Close()
         {
             _managementScope = null;
-            _connectionState = ConnectionState.Closed;
+            OnStateChange(ConnectionState.Closed);
+        }
+
+        /// <summary>
+        ///     Called when [state change].
+        /// </summary>
+        /// <param name="state">The state.</param>
+        private void OnStateChange(ConnectionState state)
+        {
+            var oldState = _connectionState;
+            _connectionState = state;
+
+            if (StateChange != null && state != oldState)
+                StateChange(this, new StateChangeEventArgs(oldState, state));
         }
 
         /// <summary>
@@ -115,8 +161,9 @@ namespace System.Data.WMI
         /// </summary>
         public override void Open()
         {
+            _managementScope = new ManagementScope(Path);
             _managementScope.Connect();
-            _connectionState = ConnectionState.Open;
+            OnStateChange(ConnectionState.Open);
         }
 
         /// <summary>

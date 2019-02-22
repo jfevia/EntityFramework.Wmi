@@ -8,7 +8,15 @@ namespace System.Data.WMI.EF6
     /// </summary>
     public sealed class WMIProviderFactory : DbProviderFactory, IServiceProvider, IDisposable
     {
+        public static readonly WMIProviderFactory Instance = new WMIProviderFactory();
+
         private bool _disposed;
+
+        /// <summary>
+        ///     Specifies whether the specific <see cref="T:System.Data.Common.DbProviderFactory"></see> supports the
+        ///     <see cref="T:System.Data.Common.DbDataSourceEnumerator"></see> class.
+        /// </summary>
+        public override bool CanCreateDataSourceEnumerator => true;
 
         /// <summary>
         ///     Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
@@ -35,6 +43,18 @@ namespace System.Data.WMI.EF6
                 return WMIProviderServices.Instance;
 
             return null;
+        }
+
+        /// <summary>
+        ///     Returns a new instance of the provider's class that implements the
+        ///     <see cref="T:System.Data.Common.DbDataSourceEnumerator"></see> class.
+        /// </summary>
+        /// <returns>
+        ///     A new instance of <see cref="T:System.Data.Common.DbDataSourceEnumerator"></see>.
+        /// </returns>
+        public override DbDataSourceEnumerator CreateDataSourceEnumerator()
+        {
+            throw new NotImplementedException();
         }
 
         /// <summary>
@@ -101,10 +121,8 @@ namespace System.Data.WMI.EF6
         private void CheckDisposed()
         {
             if (_disposed)
-            {
                 throw new ObjectDisposedException(
                     typeof(WMIProviderFactory).Name);
-            }
         }
 
         /// <summary>

@@ -8,7 +8,7 @@ namespace System.Data.WMI
     /// <summary>
     ///     WMI implementation of DbConnectionStringBuilder.
     /// </summary>
-    [DefaultProperty("DataSource")]
+    [DefaultProperty("Namespace")]
     [DefaultMember("Item")]
     public sealed class WMIConnectionStringBuilder : DbConnectionStringBuilder
     {

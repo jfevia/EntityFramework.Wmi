@@ -215,7 +215,7 @@ namespace System.Data.WMI.EF6.Gen
         /// <summary>
         ///     The top of the stack
         /// </summary>
-        private bool IsParentAJoin => _isParentAJoinStack.Count == 0 ? false : _isParentAJoinStack.Peek();
+        private bool IsParentAJoin => _isParentAJoinStack.Count != 0 && _isParentAJoinStack.Peek();
 
         internal Dictionary<string, int> AllExtentNames { get; private set; }
 
@@ -275,15 +275,17 @@ namespace System.Data.WMI.EF6.Gen
         /// </summary>
         /// <param name="manifest"></param>
         /// <param name="tree">command tree</param>
+        /// <param name="columns">The columns.</param>
         /// <param name="parameters">
         ///     Parameters to add to the command tree corresponding
         ///     to constants in the command tree. Used only in ModificationCommandTrees.
         /// </param>
         /// <param name="commandType"></param>
         /// <returns>The string representing the SQL to be executed.</returns>
-        internal static string GenerateSql(WMIProviderManifest manifest, DbCommandTree tree, out List<DbParameter> parameters, out CommandType commandType)
+        internal static string GenerateSql(WMIProviderManifest manifest, DbCommandTree tree, out IList<string> columns, out List<DbParameter> parameters, out CommandType commandType)
         {
             commandType = CommandType.Text;
+            columns = null;
 
             //Handle Query
             if (tree is DbQueryCommandTree queryCommandTree)
@@ -292,6 +294,7 @@ namespace System.Data.WMI.EF6.Gen
                 parameters = null;
 
                 var sql = sqlGen.GenerateSql((DbQueryCommandTree) tree);
+                columns = sqlGen.Columns.ToList();
 
                 return sql;
             }
@@ -303,18 +306,22 @@ namespace System.Data.WMI.EF6.Gen
                 parameters = null;
 
                 var sql = sqlGen.GenerateFunctionSql(dbFunctionCommandTree, out commandType);
+                columns = sqlGen.Columns.ToList();
 
                 return sql;
             }
 
             //Handle Insert
-            if (tree is DbInsertCommandTree insertCommandTree) return DmlSqlGenerator.GenerateInsertSql(insertCommandTree, out parameters);
+            if (tree is DbInsertCommandTree insertCommandTree)
+                return DmlSqlGenerator.GenerateInsertSql(insertCommandTree, out parameters);
 
             //Handle Delete
-            if (tree is DbDeleteCommandTree deleteCommandTree) return DmlSqlGenerator.GenerateDeleteSql(deleteCommandTree, out parameters);
+            if (tree is DbDeleteCommandTree deleteCommandTree)
+                return DmlSqlGenerator.GenerateDeleteSql(deleteCommandTree, out parameters);
 
             //Handle Update
-            if (tree is DbUpdateCommandTree updateCommandTree) return DmlSqlGenerator.GenerateUpdateSql(updateCommandTree, out parameters);
+            if (tree is DbUpdateCommandTree updateCommandTree)
+                return DmlSqlGenerator.GenerateUpdateSql(updateCommandTree, out parameters);
 
             throw new NotSupportedException("Unrecognized command tree type");
         }
@@ -356,19 +363,12 @@ namespace System.Data.WMI.EF6.Gen
                 result = sqlBuilder;
             }
 
-            if (_isVarRefSingle) throw new NotSupportedException();
+            if (_isVarRefSingle)
+                throw new NotSupportedException();
 
             // Check that the parameter stacks are not leaking.
             Debug.Assert(_selectStatementStack.Count == 0);
             Debug.Assert(_isParentAJoinStack.Count == 0);
-
-            //if (_typeDefs.Length > 0)
-            //{
-            //  _typeDefs.Insert(0x0, "TYPES ");
-            //  _typeDefs.Append(";\r\n");
-            //  _typeDefs.Append(WriteSql(result));
-            //  return _typeDefs.ToString();
-            //}
 
             return WriteSql(result);
         }
@@ -435,7 +435,7 @@ namespace System.Data.WMI.EF6.Gen
         private bool TryTranslateIntoIn(DbOrExpression e, out ISqlFragment sqlFragment)
         {
             var values = new KeyToListMap<DbExpression, DbExpression>(KeyFieldExpressionComparer.Singleton);
-            if (!(HasBuiltMapForIn(e, values) && values.Keys.Count() > 0))
+            if (!(HasBuiltMapForIn(e, values) && values.Keys.Any()))
             {
                 sqlFragment = null;
                 return false;
@@ -979,7 +979,8 @@ namespace System.Data.WMI.EF6.Gen
 
             // GroupBy is compatible with Filter and OrderBy
             // but not with Project, GroupBy
-            if (!IsCompatible(innerQuery, e.ExpressionKind)) innerQuery = CreateNewSelectStatement(innerQuery, e.Input.VariableName, e.Input.VariableType, out fromSymbol);
+            if (!IsCompatible(innerQuery, e.ExpressionKind))
+                innerQuery = CreateNewSelectStatement(innerQuery, e.Input.VariableName, e.Input.VariableType, out fromSymbol);
 
             _selectStatementStack.Push(innerQuery);
             _symbolTable.EnterScope();
@@ -1260,7 +1261,8 @@ namespace System.Data.WMI.EF6.Gen
         /// <returns></returns>
         public override ISqlFragment Visit(DbNewInstanceExpression e)
         {
-            if (MetadataHelpers.IsCollectionType(e.ResultType)) return VisitCollectionConstructor(e);
+            if (MetadataHelpers.IsCollectionType(e.ResultType))
+                return VisitCollectionConstructor(e);
             throw new NotSupportedException();
         }
 
@@ -1279,11 +1281,14 @@ namespace System.Data.WMI.EF6.Gen
         public override ISqlFragment Visit(DbNotExpression e)
         {
             // Flatten Not(Not(x)) to x.
-            if (e.Argument is DbNotExpression notExpression) return notExpression.Argument.Accept(this);
+            if (e.Argument is DbNotExpression notExpression)
+                return notExpression.Argument.Accept(this);
 
-            if (e.Argument is DbIsEmptyExpression isEmptyExpression) return VisitIsEmptyExpression(isEmptyExpression, true);
+            if (e.Argument is DbIsEmptyExpression isEmptyExpression)
+                return VisitIsEmptyExpression(isEmptyExpression, true);
 
-            if (e.Argument is DbIsNullExpression isNullExpression) return VisitIsNullExpression(isNullExpression, true);
+            if (e.Argument is DbIsNullExpression isNullExpression)
+                return VisitIsNullExpression(isNullExpression, true);
 
             if (e.Argument is DbComparisonExpression comparisonExpression)
                 if (comparisonExpression.ExpressionKind == DbExpressionKind.Equals)
@@ -1358,7 +1363,8 @@ namespace System.Data.WMI.EF6.Gen
 
             // Project is compatible with Filter
             // but not with Project, GroupBy
-            if (!IsCompatible(result, e.ExpressionKind)) result = CreateNewSelectStatement(result, e.Input.VariableName, e.Input.VariableType, out fromSymbol);
+            if (!IsCompatible(result, e.ExpressionKind))
+                result = CreateNewSelectStatement(result, e.Input.VariableName, e.Input.VariableType, out fromSymbol);
 
             _selectStatementStack.Push(result);
             _symbolTable.EnterScope();
@@ -1409,7 +1415,8 @@ namespace System.Data.WMI.EF6.Gen
 
             // Since the DbVariableReferenceExpression is a proper child of ours, we can reset
             // isVarSingle.
-            if (e.Instance is DbVariableReferenceExpression dbVariableReferenceExpression) _isVarRefSingle = false;
+            if (e.Instance is DbVariableReferenceExpression dbVariableReferenceExpression)
+                _isVarRefSingle = false;
 
             // We need to flatten, and have not yet seen the first nested SELECT statement.
             if (instanceSql is JoinSymbol joinSymbol)
@@ -1436,8 +1443,8 @@ namespace System.Data.WMI.EF6.Gen
                 if (symbolPair.Column.Columns.ContainsKey(e.Property.Name))
                 {
                     result = new SqlBuilder();
-                    result.Append(symbolPair.Source);
-                    result.Append(".");
+                    //result.Append(symbolPair.Source);
+                    //result.Append(".");
                     result.Append(symbolPair.Column.Columns[e.Property.Name]);
                     return result;
                 }
@@ -1445,15 +1452,21 @@ namespace System.Data.WMI.EF6.Gen
             // ---------------------------------------
 
             result = new SqlBuilder();
-            result.Append(instanceSql);
-            result.Append(".");
+            //result.Append(instanceSql);
+            //result.Append(".");
 
             // At this point the column name cannot be renamed, so we do
             // not use a symbol.
-            result.Append(QuoteIdentifier(e.Property.Name));
+
+            var quoteIdentifier = QuoteIdentifier(e.Property.Name);
+            result.Append(quoteIdentifier);
+
+            Columns.Add(quoteIdentifier);
 
             return result;
         }
+
+        private HashSet<string> Columns { get; } = new HashSet<string>();
 
         /// <summary>
         ///     Any(input, x) => Exists(Filter(input,x))
@@ -1521,7 +1534,8 @@ namespace System.Data.WMI.EF6.Gen
 
             var result = VisitInputExpression(e.Input.Expression, e.Input.VariableName, e.Input.VariableType, out var fromSymbol);
 
-            if (!IsCompatible(result, e.ExpressionKind)) result = CreateNewSelectStatement(result, e.Input.VariableName, e.Input.VariableType, out fromSymbol);
+            if (!IsCompatible(result, e.ExpressionKind))
+                result = CreateNewSelectStatement(result, e.Input.VariableName, e.Input.VariableType, out fromSymbol);
 
             _selectStatementStack.Push(result);
             _symbolTable.EnterScope();
@@ -1551,7 +1565,8 @@ namespace System.Data.WMI.EF6.Gen
 
             // OrderBy is compatible with Filter
             // and nothing else
-            if (!IsCompatible(result, e.ExpressionKind)) result = CreateNewSelectStatement(result, e.Input.VariableName, e.Input.VariableType, out fromSymbol);
+            if (!IsCompatible(result, e.ExpressionKind))
+                result = CreateNewSelectStatement(result, e.Input.VariableName, e.Input.VariableType, out fromSymbol);
 
             _selectStatementStack.Push(result);
             _symbolTable.EnterScope();
@@ -2041,22 +2056,20 @@ namespace System.Data.WMI.EF6.Gen
 
             if (e.ResultType.EdmType is RowType rowType)
             {
-                //_typeDefs.Length = 0;
                 var members = rowType.Properties;
                 var separator = string.Empty;
                 for (var i = 0; i < e.Arguments.Count; ++i)
                 {
                     var argument = e.Arguments[i];
-                    if (MetadataHelpers.IsRowType(argument.ResultType)) throw new NotSupportedException();
+                    if (MetadataHelpers.IsRowType(argument.ResultType))
+                        throw new NotSupportedException();
 
                     var member = members[i];
-                    //_typeDefs.Append(separator);
-                    //_typeDefs.Append(GetSqlPrimitiveType(member.TypeUsage));
                     result.Append(separator);
                     result.AppendLine();
                     result.Append(argument.Accept(this));
-                    result.Append(" AS ");
-                    result.Append(QuoteIdentifier(member.Name));
+                    //result.Append(" AS ");
+                    //result.Append(QuoteIdentifier(member.Name));
                     separator = ", ";
                 }
             }
@@ -2108,21 +2121,6 @@ namespace System.Data.WMI.EF6.Gen
         {
             var result = new SqlBuilder();
             WriteFunctionName(result, e.Function);
-            HandleFunctionArgumentsDefault(e, result);
-            return result;
-        }
-
-        /// <summary>
-        ///     Default handling for functions with a given name.
-        ///     Translates them to functionName(arg1, arg2, ..., argn)
-        /// </summary>
-        /// <param name="e"></param>
-        /// <param name="functionName"></param>
-        /// <returns></returns>
-        private ISqlFragment HandleFunctionDefaultGivenName(DbFunctionExpression e, string functionName)
-        {
-            var result = new SqlBuilder();
-            result.Append(functionName);
             HandleFunctionArgumentsDefault(e, result);
             return result;
         }
@@ -2382,15 +2380,16 @@ namespace System.Data.WMI.EF6.Gen
             if (selectStatement.FromExtents.Count == 0 || fromSymbol != selectStatement.FromExtents[0])
             {
                 selectStatement.FromExtents.Add(fromSymbol);
-                selectStatement.From.Append(" AS ");
-                selectStatement.From.Append(fromSymbol);
+                //selectStatement.From.Append(" AS ");
+                //selectStatement.From.Append(fromSymbol);
 
                 // We have this inside the if statement, since
                 // we only want to add extents that are actually used.
                 AllExtentNames[fromSymbol.Name] = 0;
             }
 
-            if (addToSymbolTable) _symbolTable.Add(inputVarName, fromSymbol);
+            if (addToSymbolTable)
+                _symbolTable.Add(inputVarName, fromSymbol);
         }
 
         /// <summary>
@@ -2531,90 +2530,51 @@ namespace System.Data.WMI.EF6.Gen
 
             switch (primitiveType.PrimitiveTypeKind)
             {
-                case PrimitiveTypeKind.Binary:
-                    maxLength = MetadataHelpers.GetFacetValueOrDefault(type, MetadataHelpers.MaxLengthFacetName, MetadataHelpers.BinaryMaxMaxLength);
-                    if (maxLength == MetadataHelpers.BinaryMaxMaxLength)
-                        length = "max";
-                    else
-                        length = maxLength.ToString(CultureInfo.InvariantCulture);
-                    isFixedLength = MetadataHelpers.GetFacetValueOrDefault(type, MetadataHelpers.FixedLengthFacetName, false);
-                    typeName = (isFixedLength ? "binary(" : "varbinary(") + length + ")";
-                    break;
-
-                case PrimitiveTypeKind.String:
-                    // Question: How do we handle ntext?
-                    isUnicode = MetadataHelpers.GetFacetValueOrDefault(type, MetadataHelpers.UnicodeFacetName, true);
-                    isFixedLength = MetadataHelpers.GetFacetValueOrDefault(type, MetadataHelpers.FixedLengthFacetName, false);
-                    maxLength = MetadataHelpers.GetFacetValueOrDefault(type, MetadataHelpers.MaxLengthFacetName, int.MinValue);
-                    if (maxLength == int.MinValue)
-                        length = "max";
-                    else
-                        length = maxLength.ToString(CultureInfo.InvariantCulture);
-                    if (isUnicode && !isFixedLength && maxLength > 4000)
-                        length = "max";
-                    if (!isUnicode && !isFixedLength && maxLength > 8000)
-                        length = "max";
-                    if (isFixedLength)
-                        typeName = (isUnicode ? "nchar(" : "char(") + length + ")";
-                    else
-                        typeName = (isUnicode ? "nvarchar(" : "varchar(") + length + ")";
-                    break;
-
-                case PrimitiveTypeKind.DateTime:
-                    preserveSeconds = MetadataHelpers.GetFacetValueOrDefault(type, MetadataHelpers.PreserveSecondsFacetName, false);
-                    typeName = preserveSeconds ? "datetime" : "smalldatetime";
-                    break;
-
-                case PrimitiveTypeKind.Decimal:
-                    decimalPrecision = MetadataHelpers.GetFacetValueOrDefault<byte>(type, MetadataHelpers.PrecisionFacetName, 18);
-                    Debug.Assert(decimalPrecision > 0, "decimal precision must be greater than zero");
-                    decimalScale = MetadataHelpers.GetFacetValueOrDefault<byte>(type, MetadataHelpers.ScaleFacetName, 0);
-                    Debug.Assert(decimalPrecision >= decimalScale, "decimalPrecision must be greater or equal to decimalScale");
-                    Debug.Assert(decimalPrecision <= 53, "decimalPrecision must be less than or equal to 53");
-                    typeName = typeName + "(" + decimalPrecision + "," + decimalScale + ")";
-                    break;
-
-                case PrimitiveTypeKind.Int32:
-                    typeName = "int";
-                    break;
-
-                case PrimitiveTypeKind.Int64:
-                    typeName = "bigint";
-                    break;
-
-                case PrimitiveTypeKind.Int16:
-                    typeName = "smallint";
-                    break;
-
-                case PrimitiveTypeKind.Byte:
-                    typeName = "tinyint";
-                    break;
-
                 case PrimitiveTypeKind.Boolean:
-                    typeName = "bit";
+                    typeName = "boolean";
                     break;
-
+                case PrimitiveTypeKind.Int16:
+                    typeName = "sint16";
+                    break;
+                case PrimitiveTypeKind.Int32:
+                    typeName = "sint32";
+                    break;
+                case PrimitiveTypeKind.Int64:
+                    typeName = "sint64";
+                    break;
+                case PrimitiveTypeKind.Byte:
+                    typeName = "uint8";
+                    break;
+                case PrimitiveTypeKind.Decimal:
+                    typeName = "uint64";
+                    break;
                 case PrimitiveTypeKind.Single:
-                    typeName = "real";
+                    typeName = "real32";
                     break;
-
                 case PrimitiveTypeKind.Double:
-                    typeName = "float";
+                    typeName = "real64";
                     break;
-
-                case PrimitiveTypeKind.Guid:
-                    typeName = "uniqueidentifier";
+                case PrimitiveTypeKind.String:
+                    typeName = "string";
                     break;
-
+                case PrimitiveTypeKind.DateTime:
+                    typeName = "datetime";
+                    break;
+                //case PrimitiveTypeKind.UInt16:
+                //    typeName = "uint32";
+                //    break;
+                //case PrimitiveTypeKind.UInt32:
+                //    typeName = "uint64";
+                //    break;
                 default:
-                    throw new NotSupportedException("Unsupported EdmType: " + primitiveType.PrimitiveTypeKind);
+                    throw new NotSupportedException($"Unsupported EdmType: {primitiveType.PrimitiveTypeKind}");
             }
 
             return typeName;
         }
 
         /// <summary>
-        ///     Handles the expression represending DbLimitExpression.Limit and DbSkipExpression.Count.
+        ///     Handles the expression representing DbLimitExpression.Limit and DbSkipExpression.Count.
         ///     If it is a constant expression, it simply does to string thus avoiding casting it to the specific value
         ///     (which would be done if <see cref="Visit(DbConstantExpression)" /> is called)
         /// </summary>
@@ -2626,8 +2586,8 @@ namespace System.Data.WMI.EF6.Gen
 
             if (e.ExpressionKind == DbExpressionKind.Constant)
             {
-                //For constant expression we should not cast the value,
-                // thus we don't go throught the default DbConstantExpression handling
+                // For constant expression we should not cast the value,
+                // thus we don't go through the default DbConstantExpression handling
                 var sqlBuilder = new SqlBuilder();
                 sqlBuilder.Append(((DbConstantExpression) e).Value.ToString());
                 result = sqlBuilder;
@@ -2767,16 +2727,14 @@ namespace System.Data.WMI.EF6.Gen
         }
 
         /// <summary>
-        ///     We use the normal box quotes for SQL server.  We do not deal with ANSI quotes
-        ///     i.e. double quotes.
+        ///     Quotes the identifier.
         /// </summary>
-        /// <param name="name"></param>
-        /// <returns></returns>
+        /// <param name="name">The name.</param>
+        /// <returns>The quoted identifier.</returns>
         internal static string QuoteIdentifier(string name)
         {
             Debug.Assert(!string.IsNullOrEmpty(name));
-            // We assume that the names are not quoted to begin with.
-            return "[" + name.Replace("]", "]]") + "]";
+            return name;
         }
 
         private bool TryAddExpressionForIn(DbBinaryExpression e, KeyToListMap<DbExpression, DbExpression> values)
@@ -2893,7 +2851,8 @@ namespace System.Data.WMI.EF6.Gen
 
             // Filter is compatible with OrderBy
             // but not with Project, another Filter or GroupBy
-            if (!IsCompatible(result, DbExpressionKind.Filter)) result = CreateNewSelectStatement(result, input.VariableName, input.VariableType, out fromSymbol);
+            if (!IsCompatible(result, DbExpressionKind.Filter))
+                result = CreateNewSelectStatement(result, input.VariableName, input.VariableType, out fromSymbol);
 
             _selectStatementStack.Push(result);
             _symbolTable.EnterScope();
@@ -3119,5 +3078,9 @@ namespace System.Data.WMI.EF6.Gen
                 return obj.GetHashCode();
             }
         }
+    }
+
+    internal class Columns
+    {
     }
 }

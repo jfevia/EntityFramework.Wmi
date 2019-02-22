@@ -9,16 +9,6 @@ namespace System.Data.WMI.EF6.Gen
     /// </summary>
     internal static class MetadataHelpers
     {
-        internal static bool IsCanonicalFunction(EdmFunction function)
-        {
-            return function.NamespaceName == "Edm";
-        }
-
-        internal static bool IsStoreFunction(EdmFunction function)
-        {
-            return !IsCanonicalFunction(function);
-        }
-
         // Returns ParameterDirection corresponding to given ParameterMode
         internal static ParameterDirection ParameterModeToParameterDirection(ParameterMode mode)
         {

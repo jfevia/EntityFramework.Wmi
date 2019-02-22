@@ -466,7 +466,8 @@ namespace System.Data.WMI.EF6.Gen
             public override void Visit(DbScanExpression expression)
             {
                 var definingQuery = MetadataHelpers.TryGetValueForMetadataProperty<string>(expression.Target, "DefiningQuery");
-                if (definingQuery != null) throw new NotSupportedException($"Unable to update the EntitySet '{expression.Target.Name}' because it has a DefiningQuery and no <{_kind}> element exists in the <ModificationFunctionMapping> element to support the current operation.");
+                if (definingQuery != null)
+                    throw new NotSupportedException($"Unable to update the EntitySet '{expression.Target.Name}' because it has a DefiningQuery and no <{_kind}> element exists in the <ModificationFunctionMapping> element to support the current operation.");
                 _commandText.Append(SqlGenerator.GetTargetTSql(expression.Target));
             }
 
